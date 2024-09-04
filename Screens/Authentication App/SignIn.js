@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,13 +12,14 @@ import {
   TouchableOpacity,
   Alert,
   StatusBar,
+  BackHandler,
 } from 'react-native';
-import {CustomTextInput} from '../CustomTextInput';
-import {CustomButtons} from '../CustomButtons';
-import {CustomPasswordInput} from '../CustomTextInput';
-import {useNavigation} from '@react-navigation/native';
+import { CustomTextInput } from '../CustomTextInput';
+import { CustomButtons } from '../CustomButtons';
+import { CustomPasswordInput } from '../CustomTextInput';
+import { useNavigation } from '@react-navigation/native';
 // import {Auth} from '../Firebase/';
-import {MotiView} from 'moti';
+import { MotiView } from 'moti';
 // import AutoScroll from '@homielab/react-native-auto-scroll';
 import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -27,11 +28,12 @@ import {
   widthPercentageToDP,
 } from 'react-native-responsive-screen';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
-import {Auth} from '../../Firebase';
-import {GoogleSignin} from '@react-native-google-signin/google-signin';
+import { Auth } from '../../Firebase';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import auth from '@react-native-firebase/auth';
-import {AccessToken, LoginManager} from 'react-native-fbsdk-next';
-import {firebase} from '@react-native-firebase/firestore';
+import { AccessToken, LoginManager } from 'react-native-fbsdk-next';
+import { firebase } from '@react-native-firebase/firestore';
+import { detectVPN } from 'react-native-vpn-status';
 
 export const SignIn = () => {
   GoogleSignin.configure({
@@ -70,9 +72,11 @@ export const SignIn = () => {
           username: user.user.displayName,
           uid: user.user.uid,
           adQuantityFb: 0,
-          totalAmountWithRef: '',
           stringAmount: '',
+          Date: utcDate ? utcDate : 0,
           ReferralOF: '',
+          FriendRefEarningStart: false,
+          BoostMining: false
         });
       })
       .catch(error => {
@@ -81,9 +85,9 @@ export const SignIn = () => {
   };
   const SignInWithGoogle = async () => {
     // Check if your device supports Google Play
-    await GoogleSignin.hasPlayServices({showPlayServicesUpdateDialog: true});
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
     // Get the users ID token
-    const {idToken} = await GoogleSignin.signIn();
+    const { idToken } = await GoogleSignin.signIn();
 
     // Create a Google credential with the token
     const googleCredential = auth.GoogleAuthProvider.credential(idToken);
@@ -101,6 +105,8 @@ export const SignIn = () => {
           totalAmountWithRef: '',
           stringAmount: '',
           ReferralOF: '',
+          FriendRefEarningStart: false,
+          BoostMining: false
         });
       })
       .catch(error => {
@@ -119,13 +125,25 @@ export const SignIn = () => {
   };
 
   const naviagtion = useNavigation();
-  const {height, width} = Dimensions.get('window');
+  const { height, width } = Dimensions.get('window');
+
+  const [utcDate, setUtcDate] = useState(0);
+
+  const Date = async () => {
+    await fetch('https://timeapi.io/api/Time/current/zone?timeZone=UTC')
+      .then(response => response.json())
+      .then(data => {
+        setUtcDate(data?.date);
+      })
+  }
 
   useEffect(() => {
     GoogleSignin.configure({
       webClientId:
         '392335208422-5he35ukml4q8be5h6uqe9cfpqmji52q2.apps.googleusercontent.com',
     });
+
+    Date();
   }, []);
 
   const [email, setEmail] = useState();
@@ -136,12 +154,57 @@ export const SignIn = () => {
     return (
       <Text>
         Don't Have an Account?{' '}
-        <Text style={{color: '#13da5ad9'}}>Create One</Text>
+        <Text style={{ color: '#13da5ad9' }}>Create One</Text>
       </Text>
     );
   };
 
   // blue = #0165E1
+
+  const [detectionVpn, setDetectVPN] = useState(false);
+
+  const getStatusVPN = async () => {
+    let val = await detectVPN(); // bool
+    setDetectVPN(val);
+  }
+
+
+  const NetData = () => {
+
+    try {
+      fetch('http://ip-api.com/json/?fields=61439')
+        .then(response => response.json())
+        .then(data => {
+          setTimeout(() => {
+            fetch(`http://ip-api.com/json/${data?.query}?fields=country,countryCode,region,regionName,city,lat,lon,timezone,isp,proxy,hosting`)
+              .then(response => response.json())
+              .then(data => {
+                setTimeout(() => {
+                  if (data?.hosting == true || data?.proxy == true || detectionVpn == true) {
+                    Alert.alert("Admin", "Using VPN or Proxy is Prohibited!");
+                    setTimeout(() => {
+                      BackHandler.exitApp();
+                    }, 2000);
+                  } else if (data?.country != "United States") {
+                    // Alert.alert("Admin", "Sorry Currently Not Available for your region.", options = [{ text: "Exit" }]);
+                    // setTimeout(() => {
+                    //   BackHandler.exitApp();
+                    // }, 2000);
+                  }
+                }, 1000);
+              })
+          }, 2000);
+
+        })
+    } catch (error) {
+      console.log(error, "Error");
+    }
+  }
+
+  useEffect(() => {
+    NetData();
+    getStatusVPN();
+  }, [])
 
   return (
     <View style={styles.main}>
@@ -162,7 +225,7 @@ export const SignIn = () => {
         <CustomButtons
           text="Forgot Password?"
           type=""
-          customstyles={{alignSelf: 'flex-end', opacity: 0.7}}
+          customstyles={{ alignSelf: 'flex-end', opacity: 0.7 }}
           onPress={() => naviagtion.navigate('ForgotPassword')}
         />
         <CustomButtons
@@ -178,7 +241,7 @@ export const SignIn = () => {
               Auth.signIn(email, password);
             }
           }}
-          customstyles={{marginTop: '10%'}}
+          customstyles={{ marginTop: '10%' }}
         />
         <View
           style={{

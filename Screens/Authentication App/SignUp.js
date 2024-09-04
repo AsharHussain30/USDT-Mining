@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   StyleSheet,
   Text,
@@ -24,6 +24,7 @@ import {Auth} from '../../Firebase';
 import auth from '@react-native-firebase/auth';
 import { AccessToken, LoginManager } from 'react-native-fbsdk-next';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { firebase } from '@react-native-firebase/firestore';
 
 
 export const SignUp = () => {
@@ -59,7 +60,18 @@ export const SignUp = () => {
     const user_signIn = auth()
       .signInWithCredential(facebookCredential)
       .then(user => {
-        console.log(user);
+        let currentId = auth().currentUser.uid;
+        firebase.firestore().collection('users').doc(currentId).update({
+          email: user.user.email,
+          username: user.user.displayName,
+          uid: user.user.uid,
+          adQuantityFb: 0,
+          stringAmount: '',
+          Date: utcDate? utcDate:0,
+          ReferralOF: '',
+          FriendRefEarningStart:false,
+          BoostMining:false,
+      });
       })
       .catch(error => {
         console.log(error);
@@ -78,13 +90,70 @@ export const SignUp = () => {
     const user_signIn = auth()
       .signInWithCredential(googleCredential)
       .then(user => {
-        console.log(user);
+        let timestamp = firebase.firestore.FieldValue.serverTimestamp();
+        let currentId = auth().currentUser.uid;
+        firebase.firestore().collection('users').doc(currentId).update({
+          email: user.user.email,
+          username: user.user.displayName,
+          uid: user.user.uid,
+          adQuantityFb: 0,
+          stringAmount: '',
+          Date: utcDate? utcDate:0,
+          ReferralOF: '',
+          FriendRefEarningStart:false,
+          BoostMining:false,
+      });
       })
       .catch(error => {
         console.log(error);
       });
   };
 
+
+  const [detectionVpn, setDetectVPN] = useState(false);
+
+  const getStatusVPN = async () => {
+    let val = await detectVPN(); // bool
+    setDetectVPN(val);
+  }
+
+
+  const NetData = () => {
+
+    try {
+      fetch('http://ip-api.com/json/?fields=61439')
+        .then(response => response.json())
+        .then(data => {
+          setTimeout(() => {
+            fetch(`http://ip-api.com/json/${data?.query}?fields=country,countryCode,region,regionName,city,lat,lon,timezone,isp,proxy,hosting`)
+              .then(response => response.json())
+              .then(data => {
+                setTimeout(() => {
+                  if (data?.hosting == true || data?.proxy == true || detectionVpn == true) {
+                    Alert.alert("Admin", "Using VPN or Proxy is Prohibited!");
+                    setTimeout(() => {
+                      BackHandler.exitApp();
+                    }, 2000);
+                  } else if (data?.country != "United States") {
+                    // Alert.alert("Admin", "Your country CPM is low Pakistan.", options = [{ text: "Exit" }]);
+                    // setTimeout(() => {
+                    //   BackHandler.exitApp();
+                    // }, 2000);
+                  }
+                }, 1000);
+              })
+          }, 2000);
+
+        })
+    } catch (error) {
+      console.log(error, "Error");
+    }
+  }
+
+  useEffect(() => {
+    NetData();
+    getStatusVPN();
+  }, [])
   return (
     <View style={{flex: 1, backgroundColor: '#101729'}}>
       <StatusBar hidden />

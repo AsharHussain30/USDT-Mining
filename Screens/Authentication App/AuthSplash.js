@@ -27,7 +27,7 @@ export const AuthSplash = () => {
             navigation.dispatch(StackActions.replace('SignIn'));
           }, 4000);
     });
-  });
+  },[]);
   const {height, width} = Dimensions.get('window');
   return (
     <View
@@ -41,7 +41,7 @@ export const AuthSplash = () => {
       <StatusBar hidden />
         <View style={{marginBottom:250,justifyContent:"center",alignItems:"center"}}>
         <Image
-          source={require('../../assets/DD.png')}
+          source={require('../../assets/USDT.png')}
           style={{
             resizeMode: 'contain',
             width: wp('50'),
@@ -63,11 +63,11 @@ export const AuthSplash = () => {
             fontFamily: 'Poppins-Regular',
             zIndex:4
           }}>
-          Dollar Dasher
+          USDT MINING
         </Text>
       </View>
       </View>
-        <Image source={require("../../assets/bg.png")} style={{position:"absolute",aspectRatio:1,height:"49.7%",width:"100%",resizeMode:"cover",alignSelf:"center",bottom:-50,zIndex:-1}}/>
+        <Image source={require("../../assets/Background.png")} style={{position:"absolute",aspectRatio:1,height:"49.7%",width:"100%",resizeMode:"contain",alignSelf:"center",bottom:hp(-10),zIndex:-1}}/>
     </View>
   );
 };

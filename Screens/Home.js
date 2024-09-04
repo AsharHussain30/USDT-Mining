@@ -31,72 +31,75 @@ import {
   InterstitialAd,
   AdEventType,
 } from 'react-native-google-mobile-ads';
-import {useDispatch, useSelector} from 'react-redux';
-import {UpdateTime} from '../Redux/Data';
+import { useDispatch, useSelector } from 'react-redux';
+import { UpdateTime } from '../Redux/Data';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {firebase} from '@react-native-firebase/firestore';
+import { firebase } from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
-// import branch from 'react-native-branch' // <-
 import BackgroundService from 'react-native-background-actions';
 import {
   responsiveFontSize,
   responsiveHeight,
   responsiveWidth,
 } from 'react-native-responsive-dimensions';
-import {GlobalContext} from './Referrals';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import { GlobalContext } from './Referrals';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { heightPercentageToDP } from 'react-native-responsive-screen';
+import LottieView from 'lottie-react-native';
+
+
+
 
 const BanneradUnitId = __DEV__
   ? TestIds.BANNER
   : 'ca-app-pub-2082762623502157/1237864043';
 
-const RewardedAdId = __DEV__
-  ? TestIds.REWARDED
-  : 'ca-app-pub-2082762623502157/8806212938';
-
-const InterstitialAdId = __DEV__
-  ? TestIds.INTERSTITIAL
-  : 'ca-app-pub-2082762623502157/8948902910';
-
 const AppOpenAdId = __DEV__
   ? TestIds.APP_OPEN
   : 'ca-app-pub-2082762623502157/6131167886';
 
-const interstitialAd = InterstitialAd.createForAdRequest(InterstitialAdId, {
-  requestNonPersonalizedAdsOnly: true,
-});
 
 const appOpenAd = InterstitialAd.createForAdRequest(AppOpenAdId, {
   requestNonPersonalizedAdsOnly: true,
 });
 
 const Home = () => {
-  const [rewardedAdLoaded, setRewardedAdLoaded] = useState(false);
   const [finalAmount, setFinalAmount] = useState(0);
   const [adQuantity, setAdQuantity] = useState(
     Number(finalAmount?.adQuantityFb) ? Number(finalAmount?.adQuantityFb) : 0,
   );
   const [amount, setAmount] = useState(0);
-  const [refAmount, setRefAmount] = useState();
+  const [refAmount, setRefAmount] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
-  const [APA, setAPA] = useState(0);
-  const [TD, setTD] = useState(0);
+  const [AdminData,setAdminData] = useState();
 
-  const TimeDuration = async () => {
-    try {
-      const data = await firebase
-        .firestore()
-        .collection('users')
-        .doc('Admin')
-        .get();
+  const [currentDate, setCurrentDate] = useState('');
 
-      setTD(data._data);
-      return data;
-    } catch (error) {
-      console.log(error);
-    }
-  };
+  let date = currentDate?.split("/")[1];
+  let month = currentDate?.split("/")[0];
+  let year = currentDate?.split("/")[2];
+
+  useEffect(() => {
+    fetch('https://timeapi.io/api/Time/current/zone?timeZone=UTC')
+      .then(response => response.json())
+      .then(data => {
+        setCurrentDate(data?.date);
+      })
+      .catch(error => {
+        console.error('Error fetching UTC date:', error);
+      });
+  }, []);
+
+  let totalAmountWithRef = Number(finalAmount?.stringAmount) > 0
+    ? Number(finalAmount?.stringAmount) + JSON.parse(refAmount ? refAmount : 0)
+    : amount + JSON.parse(refAmount ? refAmount : 0);
+
+  console.log(amount + JSON.parse(refAmount ? refAmount : 0), "Logic");
+  console.log(amount, "tot");
+  console.log(finalAmount, "finalamount");
+  console.log(totalAmountWithRef, "totamountwithref");
+  console.log(AdminData?.APA, "Apa");
 
   const AmountPerMine = async () => {
     try {
@@ -106,7 +109,7 @@ const Home = () => {
         .doc('Admin')
         .get();
 
-      setAPA(data._data);
+      setAdminData(data._data);
       return data;
     } catch (error) {
       console.log(error);
@@ -127,36 +130,92 @@ const Home = () => {
         .doc(userCurrentId)
         .collection('UsersData')
         .doc('MiningTime')
-        .update({dataForFb});
+        .update({ dataForFb });
       return data, prevTime - 1;
     } catch (error) {
       console.log(error);
     }
   };
 
+  const [dateFromFB, setDateFromFB] = useState();
+
+  const GetDate = async () => {
+    try {
+      let userData = await firebase
+        .firestore()
+        .collection('users')
+        .doc(userCurrentId);
+
+      userData.get().then(item => {
+        setDateFromFB(item?._data?.Date);
+      })
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  console.log(dateFromFB, "Date");
+
+  const [dataSend, setDataSend] = useState({});
+
+  const SendToFb = async () => {
+
+  }
+  console.log(dataSend);
+
   const amountFb = async () => {
     const amountNoString = Number(finalAmount?.stringAmount)
-      ? Number(finalAmount?.stringAmount) + APA.APA
-      : amount + APA.APA;
+      ? Number(finalAmount?.stringAmount) + AdminData?.APA
+      : amount + AdminData?.APA;
     const stringAmount = amountNoString.toString();
-    let totalAmountWithRefNoString = Number(totalAmountWithRef) + APA.APA;
+    let totalAmountWithRefNoString = Number(totalAmountWithRef) + AdminData?.APA;
     let stringtotalAmountWithRef = totalAmountWithRefNoString.toString();
     const adQuantityFb =
       finalAmount?.adQuantityFb + 1
         ? finalAmount?.adQuantityFb + 1
         : adQuantity + 1;
 
+    let sendingobj = {
+      stringAmount,
+      adQuantityFb,
+      FriendRefEarning: 0,
+    }
+
+    if (date >= dateFromFB || dateFromFB == 0 || dateFromFB == NaN) {
+      return await firebase
+        .firestore()
+        .collection('users')
+        .doc(userCurrentId).update({
+          Date: Number(date) + 1
+        });
+      // RenewAdsQuantity();
+    } else {
+      let user = await firebase
+        .firestore()
+        .collection('users')
+        .doc(userCurrentId).get()
+
+      // if (user?._data?.FriendRefEarningStart == true) {
+      //   setDataSend({
+      //     stringAmount: finalAmount?.stringAmount != 0 ? stringAmount : 0,
+      //     totalAmountWithRef: totalAmountWithRef != 0 ? stringtotalAmountWithRef : 0,
+      //     adQuantityFb,
+      //     FriendRefEarning: adQuantity + AdminData?.APA,
+      //   })
+      // }
+    }
+
+
+
+
     try {
-      const data = await firebase
+      await firebase
         .firestore()
         .collection('users')
         .doc(userCurrentId)
-        .update({
-          stringAmount,
-          totalAmountWithRef: stringtotalAmountWithRef,
-          adQuantityFb,
-        });
-      return data;
+        .update(
+          sendingobj
+        );
     } catch (error) {
       console.log(error);
     }
@@ -190,9 +249,9 @@ const Home = () => {
 
   // };
 
-  const Amount = () => {
+  const Amount = async () => {
     try {
-      const data = firebase
+      await firebase
         .firestore()
         .collection('users')
         .doc(userCurrentId)
@@ -200,8 +259,6 @@ const Home = () => {
         .then(item => {
           setFinalAmount(item?._data);
         });
-
-      return data;
     } catch (error) {
       console.log(error);
     }
@@ -219,17 +276,29 @@ const Home = () => {
   };
 
   const CreateCollections = async () => {
+    const amountNoString = Number(finalAmount?.stringAmount)
+      ? Number(finalAmount?.stringAmount) + AdminData?.APA
+      : amount + AdminData?.APA;
+    const stringAmount = amountNoString.toString();
+    let totalAmountWithRefNoString = Number(totalAmountWithRef) + AdminData?.APA;
+    let stringtotalAmountWithRef = totalAmountWithRefNoString.toString();
     if (testing?.dataForFb > 0) {
       null;
     } else {
       try {
-        await firebase
+        let userdata = await firebase
           .firestore()
           .collection('users')
-          .doc(userCurrentId)
-          .collection('UsersData')
+          .doc(userCurrentId);
+
+        // userdata.set({
+        //   stringAmount,
+        //   Date: Number(date) + 1,
+        // })
+
+        userdata.collection('UsersData')
           .doc('MiningTime')
-          .set({dataForFb: 0});
+          .set({ dataForFb: 0 });
       } catch (error) {
         console.log(error);
       }
@@ -262,21 +331,7 @@ const Home = () => {
 
   const [click, setClick] = useState(false);
 
-  // console.log(testing?.dataForFb, 'Testing');
   useEffect(() => {
-    // const unsubscribeEarned = interstitialAd.addAdEventListener(
-    //   RewardedAdEventType.EARNED_REWARD,
-    //   reward => {
-    //     console.log('User earned reward of ', reward);
-    //   },
-    // );
-    CreateCollections();
-    const unsubscribeLoaded = interstitialAd.addAdEventListener(
-      AdEventType.LOADED,
-      () => {
-        setRewardedAdLoaded(true);
-      },
-    );
     const AppOpenAddLoaded = appOpenAd.addAdEventListener(
       AdEventType.LOADED,
       () => {
@@ -284,60 +339,41 @@ const Home = () => {
         // setRewardedAdLoaded(true);
       },
     );
-    const unsubscribeClosed = interstitialAd.addAdEventListener(
-      AdEventType.CLOSED,
-      () => {
-        interstitialAd.load();
-        setRewardedAdLoaded(false);
-      },
-    );
-
     appOpenAd.load();
     AmountPerMine();
-    TimeDuration();
-
-    setTimeout(() => {
-      setAdQuantity(0);
-      console.log('ADQUANTITY TIME');
-    }, 1000 * 60 * 60 * 24);
-    // setInterval(() => {
-    //   // setTimeLeft(prevTime => (prevTime == 0 ? prevTime : prevTime - 1));
-    //   // TimeStamp();
-    //   // Amount();
-    // }, 1000);
-    TimeStamp();
     Amount();
+    SendToFb();
+    TimeStamp();
     WhoisMyReferral();
 
-    // Start loading the rewarded ad straight away
-    interstitialAd.load();
-    // Unsubscribe from events on unmount
     AmountStart();
-
+    GetDate();
     return () => {
-      unsubscribeLoaded();
-      unsubscribeClosed();
       AppOpenAddLoaded();
-
-      // unsubscribeEarned();
+      CreateCollections();
     };
   }, []);
 
   const AmountStart = (prevTime) => {
     if (prevTime == 1) {
-    setAmount(
-      totalAmountWithRef != 0
-        ? totalAmountWithRef + APA.APA
-        : Number(finalAmount?.stringAmount) + APA.APA,
+      setAmount(
+        // totalAmountWithRef != 0
+        // ? totalAmountWithRef + AdminData?.APA
+        // : Number(finalAmount?.stringAmount) + AdminData?.APA,
 
-      // : amount + 0.0015,
-    );
-    setAdQuantity(adQuantity + 1);
-    amountFb();
+        Number(finalAmount?.stringAmount) != 0
+          ? Number(finalAmount?.stringAmount) + AdminData?.APA
+          : totalAmountWithRef + AdminData?.APA
+
+
+      );
+      setAdQuantity(adQuantity + 1);
+      amountFb();
     }
   }
 
-  const {width, height} = Dimensions.get('window');
+
+  const { width, height } = Dimensions.get('window');
 
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [EasyPaisatick, setEasyPaisaTick] = useState(false);
@@ -397,7 +433,7 @@ const Home = () => {
 
   const veryIntensiveTask = async taskDataArguments => {
     // Example of an infinite loop task
-    const {delay} = taskDataArguments;
+    const { delay } = taskDataArguments;
 
     await new Promise(async resolve => {
       for (let i = 0; BackgroundService.isRunning(); i++) {
@@ -445,20 +481,6 @@ const Home = () => {
     const [email, setEmail] = useState();
     const [AccountNumber, setAccountNumber] = useState();
     const [withdrawAmount, setWithdrawAmount] = useState();
-
-    const [currentDate, setCurrentDate] = useState('');
-
-    useEffect(() => {
-      let date = new Date().getDate(); //Current Date
-      let month = new Date().getMonth() + 1; //Current Month
-      let year = new Date().getFullYear(); //Current Year
-      let hours = new Date().getHours(); //Current Hours
-      let min = new Date().getMinutes(); //Current Minutes
-      let sec = new Date().getSeconds(); //Current Seconds
-      setCurrentDate(
-        date + '/' + month + '/' + year + ' ' + hours + ':' + min + ':' + sec,
-      );
-    }, []);
 
     return (
       <View
@@ -538,12 +560,12 @@ const Home = () => {
               data
                 .doc('Admin')
                 .collection('Withdraws')
-                .add({withdrawAmount, email, AccountNumber, currentDate});
+                .add({ withdrawAmount, email, AccountNumber, currentDate });
 
               data
                 .doc(userCurrentId)
                 .collection('Withdraws')
-                .add({withdrawAmount, email, AccountNumber, currentDate});
+                .add({ withdrawAmount, email, AccountNumber, currentDate });
               setRefAmount(refAmount - withdrawAmount);
               Alert.alert(
                 'Admin',
@@ -583,7 +605,7 @@ const Home = () => {
           height: 300,
           width: 300,
           position: 'absolute',
-          zIndex: 600,
+          zIndex: 3,
           borderRadius: 10,
           alignItems: 'center',
           backgroundColor: '#101729',
@@ -699,11 +721,8 @@ const Home = () => {
     );
   };
 
-  let totalAmountWithRef = Number(finalAmount?.stringAmount)
-    ? Number(finalAmount?.stringAmount) + JSON.parse(refAmount ? refAmount : 0)
-    : amount + JSON.parse(refAmount ? refAmount : 0);
-
   const [refreshing, setRefreshing] = React.useState(false);
+  const [showLoading, setShowLoading] = React.useState(true);
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
@@ -715,6 +734,37 @@ const Home = () => {
   // console.log(refAmount, 'Ref');
   // console.log(AdTime, '123');
 
+  const Loading = () => {
+    useEffect(() => {
+      if (amount >= 0 && finalAmount) {
+        setShowLoading(false);
+      } else {
+        setAmount(
+          Number(finalAmount?.stringAmount)
+        );
+      }
+    }, [])
+    return (
+      <View style={{ height: 80, width: 300, flexDirection: "row", justifyContent: "center", alignItems: "center", borderRadius: 12, backgroundColor: "white", position: "absolute", zIndex: 3 }}>
+        <Text
+          style={{
+            color: 'black',
+            fontSize: responsiveFontSize(2),
+            fontFamily: 'Poppins-Medium',
+            marginLeft: 30
+          }}>
+          Loading Please Wait
+        </Text>
+        <View style={{ justifyContent: "center", alignItems: "center", }}>
+          <LottieView source={require("../assets/Loading.json")} style={{ height: 100, width: 100, bottom: 10 }} autoPlay loop />
+        </View>
+      </View>
+
+    )
+  }
+  console.log(showLoading, showWithdraw);
+
+
   return (
     <ScrollView
       contentContainerStyle={styles.scrollView}
@@ -722,6 +772,7 @@ const Home = () => {
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }>
+      {showLoading ? <Loading /> : null}
       {showWithdraw ? <Withdraw /> : null}
       <StatusBar backgroundColor={'#101729'} />
       {/* <View
@@ -732,9 +783,9 @@ const Home = () => {
         }}> */}
       <TouchableOpacity
         style={{
-          backgroundColor: showWithdraw ? 'black' : '#101729',
-          opacity: showWithdraw ? 0.7 : 1,
-          zIndex: 300,
+          backgroundColor: '#101729',
+          opacity: showWithdraw || showLoading ? 0.7 : 1,
+          zIndex: 2,
           flex: 1,
         }}
         activeOpacity={1}
@@ -753,30 +804,35 @@ const Home = () => {
             top: responsiveHeight(12.5),
             zIndex: 200,
           }}>
-          <Text
-            style={{
-              color: 'white',
-              fontSize: responsiveFontSize(2),
-              fontFamily: 'Poppins-Medium',
-            }}>
-            Your Balance:
+          <View style={{}}>
             <Text
               style={{
                 color: 'white',
-                fontSize: 20,
-                fontFamily: 'Poppins-Regular',
-                letterSpacing: 2,
+                fontSize: responsiveFontSize(2),
+                fontFamily: 'Poppins-Medium',
               }}>
-              {' '}
-              {/* {amount.toString()?.substring(0, 7) != 0
+              Your Balance:
+            </Text>
+            <View style={{ flexDirection: "row",justifyContent:"center",alignItems:"center" }}>
+              <Text
+                style={{
+                  color: "#13da5ad9",
+                  fontSize: responsiveFontSize(2.4),
+                  fontFamily: 'Rubik-Bold',
+                  letterSpacing: 2,
+                }}>
+                {' '}
+                {/* {amount.toString()?.substring(0, 7) != 0
                 ? amount.toString()?.substring(0, 7) + '$' */}
-              {amount.toString().substring(0, 7) + '$'}
-              {/* {highest?.stringAmount ? height?.stringAmount : amount + '$'} */}
-              {/* {finalAmount?.stringAmount
+                {amount.toString().substring(0, 7) + '$'}
+                {/* {highest?.stringAmount ? height?.stringAmount : amount + '$'} */}
+                {/* {finalAmount?.stringAmount
                 ? finalAmount?.stringAmount.toString()?.substring(0, 7) + '$'
                 : amount?.toString()?.substring(0, 7) + '$'} */}
-            </Text>
-          </Text>
+              </Text>
+              {AdminData?.BoostMiningAPA ? <LottieView source={require("../assets/rocket.json")} style={{ height: 40, width: 40,left:10 }} loop autoPlay /> : null}
+            </View>
+          </View>
           <TouchableOpacity
             onPress={() => {
               if (startServices == false) {
@@ -814,7 +870,7 @@ const Home = () => {
             alignSelf: 'center',
             marginTop: responsiveHeight(3),
           }}>
-          Dollar Dasher
+          USDT Mining
         </Text>
         <View
           style={{
@@ -854,15 +910,15 @@ const Home = () => {
             }}>
             Estimated Earning 0.225$ Monthly
           </Text> */}
-          <View style={{flexDirection: 'row'}}>
+          <View style={{ flexDirection: 'row' }}>
             <TouchableOpacity
-              disabled={
-                timeLeft == 0 &&
-                rewardedAdLoaded == true &&
-                startServices == true
-                  ? false
-                  : true
-              }
+              // disabled={
+              //   timeLeft == 0 &&
+              //   rewardedAdLoaded == true &&
+              //   startServices == true
+              //     ? false
+              //     : true
+              // }
               onPress={() => {
                 if (startServices == true) {
                   if (finalAmount?.adQuantityFb < 10) {
@@ -874,7 +930,7 @@ const Home = () => {
                       setTimeLeft(
                         testing?.dataForFb == 0 ? TD.TD : testing?.dataForFb,
                       );
-                      interstitialAd.show();
+                      //       rewardedAd.show();
                     }, 2000);
                   } else {
                     Alert.alert(
@@ -890,12 +946,12 @@ const Home = () => {
                 }
               }}
               style={{
-                backgroundColor:
-                  timeLeft == 0 &&
-                  rewardedAdLoaded == true &&
-                  startServices == true
-                    ? '#13da5ad9'
-                    : 'gray',
+                backgroundColor: '#13da5ad9',
+                // timeLeft == 0 &&
+                // rewardedAdLoaded == true &&
+                // startServices == true
+                //   ? '#13da5ad9'
+                //   : 'gray',
                 alignItems: 'center',
                 justifyContent: 'center',
                 height: 30,
@@ -918,7 +974,7 @@ const Home = () => {
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              disabled={TD.TD == timeLeft || timeLeft == 0 ? false : true}
+              // disabled={TD.TD == timeLeft || timeLeft == 0 ? false : true}
               onPress={() => {
                 if (startServices == false) {
                   StopServices();
@@ -926,10 +982,11 @@ const Home = () => {
                   StartServices();
                 }
                 setStartServices(!startServices);
+                // interstitialAd.show();
               }}
               style={{
-                backgroundColor:
-                  TD.TD == timeLeft || timeLeft == 0 ? '#13da5ad9' : 'gray',
+                backgroundColor: '#13da5ad9',
+                // TD.TD == timeLeft || timeLeft == 0 ? '#13da5ad9' : 'gray',
                 alignItems: 'center',
                 justifyContent: 'center',
                 height: 30,
@@ -991,7 +1048,7 @@ const Home = () => {
             100% Referral Commission on your{`\n`} Referral income!
           </Text>
         </View>
-        <View style={{flex: 0.2, justifyContent: 'flex-end'}}>
+        <View style={{ flex: 0.2, bottom: heightPercentageToDP(8), justifyContent: 'flex-end' }}>
           <BannerAd
             unitId={BanneradUnitId}
             size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}

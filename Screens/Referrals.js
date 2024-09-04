@@ -8,24 +8,26 @@ import {
   Alert,
   StyleSheet,
 } from 'react-native';
-import React, {createContext, useEffect, useState} from 'react';
+import React, { createContext, useEffect, useState } from 'react';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import Feather from 'react-native-vector-icons/Feather';
-import {useNavigation} from '@react-navigation/native';
-import {BannerAd, BannerAdSize, TestIds} from 'react-native-google-mobile-ads';
+import { useNavigation } from '@react-navigation/native';
+import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 import branch from 'react-native-branch';
 import auth from '@react-native-firebase/auth';
-import {firebase} from '@react-native-firebase/firestore';
-import {useDispatch, useSelector} from 'react-redux';
-import {Disable} from '../Redux/Data';
+import { firebase } from '@react-native-firebase/firestore';
+import { useDispatch, useSelector } from 'react-redux';
+import { Disable } from '../Redux/Data';
 import {
   responsiveFontSize,
   responsiveHeight,
   responsiveWidth,
 } from 'react-native-responsive-dimensions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {RefreshControl, ScrollView} from 'react-native-gesture-handler';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { RefreshControl, ScrollView } from 'react-native-gesture-handler';
+import { heightPercentageToDP } from 'react-native-responsive-screen';
+import LottieView from 'lottie-react-native';
 
 const green = '#13da5ad9';
 const backgroundcolor = '#101729';
@@ -39,8 +41,16 @@ const Referrals = () => {
   const [disable, setDisable] = useState(false);
   const [totalReferrals, setTotolReferrals] = useState([]);
   const [RefAmount, setRefAmount] = useState();
-
+  let totalQuantity = totalReferrals.length;
+  const totalEarning = RefAmount > 0 ? RefAmount : '0' + ' $';
+  const currentId = auth().currentUser.uid;
+  const myRefCode = currentId.toString().substring(0, 8);
   console.log(friendsCode, 'friendsCode');
+  console.log(myRefCode, "myref");
+  console.log(totalEarning, "totalEarning");
+  console.log(totalQuantity, "totalQuantity");
+
+
 
   const BanneradUnitId = __DEV__
     ? TestIds.BANNER
@@ -51,7 +61,14 @@ const Referrals = () => {
   const onShare = async () => {
     try {
       const result = await Share.share({
-        message: `USDTMining Referral Earning Enter my code in USDTMINING app ${myRefCode}!`,
+        message: `🚀 USDTMining Referral Earning 🚀
+
+Enter my referral code: [${myRefCode}] in the USDTMining app to start earning USDT for free! 💸
+
+💡 Download the USDTMining app now: [Google Drive Link]
+👉 Start mining USDT and complete tasks to maximize your earnings!
+
+Don't miss out on this opportunity to earn USDT effortlessly. Download, enter my code, and let the mining begin! ⛏️📲`,
       });
       if (result.action === Share.sharedAction) {
         if (result.activityType) {
@@ -66,9 +83,7 @@ const Referrals = () => {
       alert(error.message);
     }
   };
-  const currentId = auth().currentUser.uid;
 
-  const myRefCode = currentId.toString().substring(0, 8);
 
   // const ReferralCode = Data?.filter(
   //   item => item?.uid?.toString()?.substring(0, 8) == FRef,
@@ -89,6 +104,11 @@ const Referrals = () => {
       setAnimation(true);
       setSuccessPopup(false);
     }, 2000);
+    useEffect(() => {
+      firebase.firestore().collection("users").doc(currentId).update({
+        FriendRefEarningStart:true
+      })
+    },[])
     return (
       <View
         style={{
@@ -105,39 +125,19 @@ const Referrals = () => {
           alignItems: 'center',
           justifyContent: 'space-evenly',
         }}>
-        <View style={{display: Animation ? 'none' : 'flex'}}>
+        <View style={{ display: Animation ? 'none' : 'flex' }}>
           <Image
             source={require('../assets/tick.gif')}
-            style={{height: '50%', width: '20%', aspectRatio: 1}}
+            style={{ height: '50%', width: '20%', aspectRatio: 1 }}
           />
         </View>
         <Text
-          style={{color: 'white', fontSize: 12, fontFamily: 'Poppins-Medium'}}>
+          style={{ color: 'white', fontSize: 12, fontFamily: 'Poppins-Medium' }}>
           Your Referral Code Successfully Added!
         </Text>
       </View>
     );
   };
-
-  const [APR, setAPR] = useState(0);
-
-  const AmountPerRefByAdmin = async () => {
-    try {
-      let data = await firebase
-        .firestore()
-        .collection('users')
-        .doc('Admin')
-        .get();
-
-      setAPR(data._data);
-      return data;
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  let totalQuantity = totalReferrals.length;
-  const totalEarning = RefAmount > 0 ? RefAmount : '0' + ' $';
 
   const WhoisMyReferral = async () => {
     try {
@@ -172,7 +172,7 @@ const Referrals = () => {
         .doc(currentId)
         .collection('UsersData')
         .doc('ReferralCode')
-        .set({refCode: myRefCode, friendsCode: friendsCode});
+        .set({ refCode: myRefCode, friendsCode: friendsCode });
       console.log('Data Send');
     } catch (error) {
       console.log(error, 'RefToFb');
@@ -181,19 +181,17 @@ const Referrals = () => {
 
   const FriendsCode = async () => {
     try {
-      let user = await firebase
+      await firebase
         .firestore()
         .collection('users')
         .where('uid', '!=', currentId)
-        .get();
-      let data = user.docs.map(item => item.data());
-      let confirm = data.filter(
-        item => item.uid.toString().substring(0, 8) == friendsCode?.toString(),
-      );
-
-      console.log(confirm, 'Confirm');
-      setData(confirm);
-      return user;
+        .get().then((user) => {
+          let data = user.docs.map(item => item.data());
+          let confirm = data.filter(
+            item => item.uid.toString().substring(0, 8) == friendsCode?.toString(),
+          );
+          setData(confirm);
+        })
     } catch (error) {
       console.log(error, 'FriendsCode');
     }
@@ -202,21 +200,21 @@ const Referrals = () => {
 
   const GetDisable = async () => {
     try {
-      let data = await firebase
+      await firebase
         .firestore()
         .collection('users')
         .doc(currentId)
         .collection('UsersData')
         .doc('ReferralCode')
-        .get();
-      setFRef(data?._data?.friendsCode);
+        .get().then((item) => {
+          setFRef(item?._data?.friendsCode);
+        })
     } catch (error) {
       console.log(error, 'GetDisable');
     }
   };
 
   const TotolReferrals = async () => {
-    console.log(FRef, 'Fref');
     try {
       let Fref = await firebase
         .firestore()
@@ -226,15 +224,14 @@ const Referrals = () => {
         .doc('ReferralCode')
         .get();
 
-      let data = await firebase
+      await firebase
         .firestore()
         .collection('users')
         .doc(currentId)
-        .update({ReferralOF: Fref?._data?.friendsCode});
+        .update({ ReferralOF: Fref?._data?.friendsCode });
 
-      return data;
     } catch (error) {
-      console.log(error);
+      console.log(error, "This");
     }
   };
   console.log(RefAmount, 'Ref');
@@ -245,10 +242,10 @@ const Referrals = () => {
     WhoisMyReferral();
     GetDisable();
     TotolReferrals();
-    AmountPerRefByAdmin();
   }, []);
 
-  const [refreshing, setRefreshing] = React.useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [showloading, setShowLoading] = useState(true);
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
@@ -257,15 +254,47 @@ const Referrals = () => {
     }, 2000);
   }, []);
 
+  const Loading = () => {
+    useEffect(() => {
+      if (totalEarning ? totalEarning : 0 && totalQuantity && myRefCode) {
+        setShowLoading(false);
+      }
+    }, [])
+    return (
+      <View style={{ height: 80, width: 300, flexDirection: "row", justifyContent: "center", alignItems: "center", borderRadius: 12, backgroundColor: "white", position: "absolute", zIndex: 3 }}>
+        <Text
+          style={{
+            color: 'black',
+            fontSize: responsiveFontSize(2),
+            fontFamily: 'Poppins-Medium',
+            marginLeft: 30
+          }}>
+          Loading Please Wait
+        </Text>
+        <View style={{ justifyContent: "center", alignItems: "center", }}>
+          <LottieView source={require("../assets/Loading.json")} style={{ height: 100, width: 100, bottom: 10 }} autoPlay loop />
+        </View>
+      </View>
+
+    )
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollView}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }>
-        <View style={{flex: 1, backgroundColor: backgroundcolor}}>
-          {SuccessPopup ? <Popup /> : null}
+        {showloading ? <Loading /> : null}
+        {SuccessPopup ? <Popup /> : null}
+        <View style={{
+          flex: 1,
+          backgroundColor: backgroundcolor,
+          opacity: SuccessPopup || showloading ? 0.7 : 1,
+          zIndex: 2,
+        }}>
           <View
             style={{
               marginTop: 20,
@@ -327,8 +356,8 @@ const Referrals = () => {
               }}>
               Share with your friends and get 100% on their earning!
             </Text>
-            <View style={{alignItems: 'center', marginTop: 20}}>
-              <View style={{marginBottom: 20}}>
+            <View style={{ alignItems: 'center', marginTop: 20 }}>
+              <View style={{ marginBottom: 20 }}>
                 <Text
                   style={{
                     color: 'white',
@@ -428,7 +457,7 @@ const Referrals = () => {
                   ) {
                     refToFb();
                     setDisable(true);
-                    Alert.alert("Admin","Make sure your mining and services buttons are Stop. Confirm your referral code by restarting your app.")
+                    Alert.alert("Admin", "Make sure your mining and services buttons are Stop. Confirm your referral code by restarting your app.")
                   } else {
                     Alert.alert('Invalid Referral Code!');
                   }
@@ -459,7 +488,7 @@ const Referrals = () => {
               </TouchableOpacity>
             </View>
           </View>
-          <View style={{flex: 0.2, justifyContent: 'flex-end'}}>
+          <View style={{ flex: 0.2, bottom: "6%", justifyContent: 'flex-end' }}>
             <BannerAd
               unitId={BanneradUnitId}
               size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
@@ -475,10 +504,12 @@ const Referrals = () => {
 };
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    height: "100%",
+    width: "100%"
   },
   scrollView: {
-    flex: 1,
+    height: "100%",
+    width: "100%",
     alignItems: 'center',
     justifyContent: 'center',
   },
